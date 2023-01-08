@@ -1,0 +1,6 @@
+.venv
+*.env
+*.session
+*.session-journal
+*.db
+*.log
