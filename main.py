@@ -1,6 +1,8 @@
 # pyright:reportMissingTypeStubs=false
 # pyright:reportUnusedFunction=false
 
+from argparse import ArgumentParser
+
 from telethon.sync import events
 
 from asyncio import new_event_loop, set_event_loop, AbstractEventLoop
@@ -13,6 +15,7 @@ from db.init_db import init_db
 
 from classes.telethon_protocols import EventProtocol, TelegramClientProtocol
 from classes.sqlalchemy_protocols import EngineProtocol, SessionProtocol
+from classes.validation_exceptions import InvalidEnvironmentException
 
 from app.utils.create_client import create_client
 from app.utils.get_client_data import get_client_data
@@ -37,7 +40,18 @@ from app.routes.filter_routes.view_filters import view_filters as view_filters_r
 
 handler_type: TypeAlias = Callable[[EventProtocol], Coroutine[Any, Any, None]]
 response_handler_type: TypeAlias = Callable[[str | Exception], Coroutine[Any, Any, None]]
-    
+
+
+def configure_parser() -> ArgumentParser:
+    parser = ArgumentParser(
+        prog = "create_db",
+        description = "Creates the database using the information on the .env file.",
+        epilog = ""
+    )
+    parser.add_argument("env", type=str, help="Environment to load. [dev or prod]")
+    return parser
+
+
 # route function names starting with connection_handler are restricted to only be used as a connection between two telegram channels
 
 
@@ -132,7 +146,8 @@ def main(env: str) -> None | Exception:
         """/view_all_channel"""
         res: str | Exception = view_all_channels_route(event.chat_id, session)
         await response_handler(res)
-        
+    
+    # connection managing routes
     @client.on(events.NewMessage(chats=[client_data.url], pattern="^/view_connections"))
     async def view_connections(event: EventProtocol) -> None:
         """/view_connections"""
@@ -151,7 +166,6 @@ def main(env: str) -> None | Exception:
         res: str | Exception = disconnect_channels_route(event.message.message, event.chat_id, session, client)
         await response_handler(res)
     
-    # filter managing routes
     # filter add routes
     @client.on(events.NewMessage(chats=[client_data.url], pattern="^/add_to_blacklist"))
     async def add_to_blacklist(event: EventProtocol) -> None:
@@ -214,5 +228,11 @@ def main(env: str) -> None | Exception:
     
     
 if __name__ == "__main__":
-    x = main("dev")
-    if isinstance(x, Exception): raise x
+    parser = configure_parser()
+    args = parser.parse_args()
+    if args.env in ["dev", "prod"]:
+        res = main(args.env)
+    else:
+        raise InvalidEnvironmentException(env=args.env)
+    
+    if isinstance(res, Exception): raise res

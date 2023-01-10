@@ -1,5 +1,7 @@
 from bcrypt import hashpw
 
+from argparse import ArgumentParser
+
 from uuid import uuid4
 
 from app.utils.env import get_env_var, load_env
@@ -9,6 +11,17 @@ from db.schema import Admin, Base
 
 from classes.sqlalchemy_protocols import SessionProtocol, EngineProtocol
 
+from classes.validation_exceptions import InvalidEnvironmentException
+
+
+def configure_parser() -> ArgumentParser:
+    parser = ArgumentParser(
+        prog = "create_db",
+        description = "Creates the database using the information on the .env file.",
+        epilog = ""
+    )
+    parser.add_argument("env", type=str, help="Environment to load. [dev or prod]")
+    return parser
 
 
 def main() -> None | Exception:
@@ -43,5 +56,10 @@ def main() -> None | Exception:
 
 
 if __name__ == "__main__":
-    load_env("dev")
-    main()
+    parser: ArgumentParser = configure_parser()
+    args = parser.parse_args()
+    if args.env in ["dev", "prod"]:
+        load_env(args.env)
+        main()
+    else:
+        raise InvalidEnvironmentException(env=args.env)

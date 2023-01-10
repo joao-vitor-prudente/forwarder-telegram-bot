@@ -6,22 +6,24 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from telethon.sync import events
 
-from classes.telethon_protocols import EventProtocol, TelegramClientProtocol
+from app.utils.treat_message import treat_message
+
+from classes.telethon_protocols import EventBuilderProtocol, EventProtocol, TelegramClientProtocol
 from classes.fatal_exceptions import CannotRemoveEventHandlerException, CannotAddEventHandlerException, DatabaseQueryException
 from classes.sqlalchemy_protocols import SessionProtocol
 
-from db.schema import Channel
+from db.schema import Channel, Filter
 
 
 handler_type: TypeAlias = Callable[[EventProtocol], Coroutine[Any, Any, None]]
 
 
-def remove_event_handler(handler: handler_type, event:  Any, client: TelegramClientProtocol) -> None | Exception:
+def remove_event_handler(handler: handler_type, event:  EventBuilderProtocol, client: TelegramClientProtocol) -> None | Exception:
     """Remove event handler from client.
 
     Args:
         handler (handler_type): event callback function.
-        event (Any): event instance.
+        event (EventBuilderProtocol): event instance.
         client (TelegramClientProtocol): telegram client instance.
     
     Returns:
@@ -75,32 +77,36 @@ def get_channel_pairs(channels: list[Channel]) -> list[tuple[Channel, Channel]]:
 
 
 
-def get_event_handler(input_channel: Channel, output_channel: Channel, client: TelegramClientProtocol) -> tuple[handler_type, events.NewMessage]:
+def get_event_handler(input_channel: Channel, output_channel: Channel, client: TelegramClientProtocol, session: SessionProtocol) -> tuple[handler_type, events.NewMessage]:
     """Get event handler for a channel pair.
 
     Args:
         input_channel (Channel): input channel instance.
         output_channel (Channel): output channel instance.
         client (TelegramClientProtocol): telegram client instance.
+        session (SessionProtocol): sqlalchemy session instance.
 
     Returns:
         tuple[handler_type, events.NewMessage]: event handler and event instance.
     """
     
     async def handler(event: EventProtocol):
-        await client.send_message(output_channel.url, event.message.message)
+        filters: list[Filter] = session.query(Filter).all()
+        treated_message: None | str = treat_message(event.message.message, filters)
+        if treated_message is None: return
+        await client.send_message(output_channel.url, treated_message)
     
     # save input and output urls in the handler's name to be able to identify it later
     handler.__name__ = f"connection_handler - ({input_channel.id}) -> ({output_channel.id})"
     return handler, events.NewMessage(chats=[input_channel.url])
   
     
-def add_event_handler(handler: handler_type, event: Any, client: TelegramClientProtocol) -> None | Exception:
-    """Add event handler to client.
+def register_event_handler(handler: handler_type, event: EventBuilderProtocol, client: TelegramClientProtocol) -> None | Exception:
+    """Registers event handler to client.
 
     Args:
         handler (handler_type): event callback function.
-        event (Any): event instance.
+        event (EventBuilderProtocol): event instance.
         client (TelegramClientProtocol): telegram client instance.
     
     Returns:
@@ -139,12 +145,12 @@ def remanage_connections(session: SessionProtocol, client: TelegramClientProtoco
     channel_pairs: list[tuple[Channel, Channel]] = get_channel_pairs(channels)
     
     event_handlers: list[tuple[handler_type, events.NewMessage]] = [
-        get_event_handler(input_channel, output_channel, client) 
+        get_event_handler(input_channel, output_channel, client, session) 
         for input_channel, output_channel in channel_pairs
     ]
     
     res: list[Exception | None] = [
-        add_event_handler(handler, event, client) 
+        register_event_handler(handler, event, client) 
         for handler, event in event_handlers
     ]
     exceptions: list[Exception] = [e for e in res if isinstance(e, Exception)]

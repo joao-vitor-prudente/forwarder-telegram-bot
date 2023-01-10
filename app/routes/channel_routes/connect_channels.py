@@ -2,12 +2,11 @@
 
 from sqlalchemy.exc import SQLAlchemyError
 
-from telethon.sync import events
-
 from typing import Callable, Any, Coroutine, TypeAlias
 
 from app.utils.get_channel_filter_attr import get_channel_filter_attr
 from app.utils.get_loop import get_loop
+from app.utils.remanage_connections import get_event_handler, register_event_handler, remove_event_handler
 
 from app.cmd.handle_command import handle_command
 
@@ -15,7 +14,7 @@ from app.auth.is_authorized import is_authorized
 
 from classes.validation_exceptions import ChannelDoesNotExistException, ChannelsAlreadyConnectedException, ChannelLoopException
 from classes.validation_exceptions import NotAuthorizedException, SameInputAndOutputException
-from classes.fatal_exceptions import TelegramConnectionException, DatabaseQueryException, DatabaseCommitException, RollBackException
+from classes.fatal_exceptions import DatabaseQueryException, DatabaseCommitException, RollBackException
 from classes.telethon_protocols import EventProtocol, TelegramClientProtocol
 from classes.sqlalchemy_protocols import SessionProtocol
 
@@ -81,46 +80,6 @@ def validate(input_channel: Channel | None, output_channel: Channel | None) -> t
         return input_channel, output_channel
     
     return ChannelLoopException(input_id=str(input_channel.id), output_id=str(output_channel.id), loop=loop)
-
-
-def get_event_handler(input_channel: Channel, output_channel: Channel, client: TelegramClientProtocol) -> tuple[handler_type, events.NewMessage]:
-    """Generates the event handler function.
-
-    Args:
-        input_channel (Channel): input channel instance.
-        output_channel (Channel): output channel instance.
-        client (TelegramClientProtocol): telegram client instance.
-
-    Returns:
-        tuple[handler_type, events.NewMessage]: event handler function and event instance.
-    """
-    
-    async def handler(event: EventProtocol):
-        await client.send_message(output_channel.url, event.message.message)
-    
-    # save input and output urls in the handler's name to be able to identify it later
-    handler.__name__ = f"connection_handler - ({input_channel.id}) -> ({output_channel.id})"
-    return handler, events.NewMessage(chats=[input_channel.url])
-
-
-def register_event_handler(handler: handler_type, event: events.NewMessage, input_id: str, output_id: str, client: TelegramClientProtocol) -> None | Exception:
-    """Registers the event handler to telegram client
-
-    Args:
-        handler (handler_type): handler call backfunction.
-        event (events.NewMessage): new message event instance
-        input_id (str): input channel id.
-        output_id (str): output channel id.
-        client (TelegramClientProtocol): telegram client instance.
-
-    Returns:
-        None | Exception: None if everything went well or exception if any.
-    """
-    
-    try:
-        client.add_event_handler(handler, event)
-    except Exception as e:
-        return TelegramConnectionException(input_id=input_id, output_id=output_id, exc=e)
     
 
 def commit_to_database(session: SessionProtocol, input_channel: Channel, output_channel: Channel) -> None | Exception:
@@ -141,25 +100,6 @@ def commit_to_database(session: SessionProtocol, input_channel: Channel, output_
     except SQLAlchemyError as e:
         session.rollback()
         return DatabaseCommitException(exc=e)
-
-
-def rollback_event_handler(handler: handler_type, input_channel: Channel, output_channel: Channel, client: TelegramClientProtocol) -> None | Exception:
-    """Removes the event handler from telegram client.
-
-    Args:
-        handler (handler_type): handler callback function.
-        input_channel (Channel): input channel instance.
-        output_channel (Channel): output channel instance.
-        client (TelegramClientProtocol): telegram client instance.
-    
-    Returns:
-        None | Exception: None if everything went well or exception if any.
-    """
-    
-    try:
-        client.remove_event_handler(handler, events.NewMessage(chats=[input_channel.url]))
-    except Exception as e:
-        return  TelegramConnectionException(input_id=str(input_channel.id), output_id=str(output_channel.id), exc=e)
 
 
 def connect_channels(command: str | None, chat_id: int, session: SessionProtocol, client: TelegramClientProtocol) -> str | Exception: 
@@ -202,10 +142,10 @@ def connect_channels(command: str | None, chat_id: int, session: SessionProtocol
     validated_input_channel, validated_output_channel = validated_channels
     
     # get event handler and event
-    handler, event = get_event_handler(input_channel, output_channel, client)
+    handler, event = get_event_handler(input_channel, output_channel, client, session)
     
     # register event handler
-    register_res: None | Exception = register_event_handler(handler, event, str(validated_input_channel.id), str(validated_output_channel.id), client)
+    register_res: None | Exception = register_event_handler(handler, event, client)
     if isinstance(register_res, Exception): return register_res
     
     # commit to database
@@ -213,7 +153,7 @@ def connect_channels(command: str | None, chat_id: int, session: SessionProtocol
     
     # if commit fails
     if isinstance(commit_res, Exception): 
-        rollback_res: None | Exception = rollback_event_handler(handler, validated_input_channel, validated_output_channel, client)
+        rollback_res: None | Exception = remove_event_handler(handler, event, client)
         
         # if roll back fails
         if isinstance(rollback_res, Exception):

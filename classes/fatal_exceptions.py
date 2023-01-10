@@ -98,28 +98,6 @@ class RollBackException(FatalException):
         
 
 # telegram connection exceptions
-class TelegramConnectionException(FatalException):
-    def __init__(
-        self: "TelegramConnectionException", 
-        exc: Exception, 
-        message: str = "Could not establish a telegram connection between input and output channels.",
-        input_id: str | None = None, 
-        output_id: str | None = None
-    ):
-        super().__init__(exc, message)
-        self.input_id = input_id
-        self.output_id = output_id
-
-    def __repr__(self: "TelegramConnectionException") -> str:
-        return str({
-            "type": __class__.__name__, 
-            "message": self.message, 
-            "input_id": self.input_id, 
-            "output_id": self.output_id, 
-            "exc": str(self.exc)
-        })
-        
-        
 class CannotRemoveEventHandlerException(FatalException):
     def __init__(
         self: "CannotRemoveEventHandlerException", 

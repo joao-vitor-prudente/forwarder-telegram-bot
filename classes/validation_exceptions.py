@@ -15,7 +15,24 @@ class ValidationException(ABC, Exception):
         pass
     
 
-# environment variables exceptions
+# environment exceptions
+class InvalidEnvironmentException(ValidationException):
+    def __init__(
+        self: "InvalidEnvironmentException", 
+        message: str = "Invalid environmt. Try dev or prod", 
+        env: str | None = None
+    ):
+        self.message = message
+        self.env = env
+    
+    def __repr__(self: "InvalidEnvironmentException") -> str:
+        return str({
+            "type": __class__.__name__, 
+            "message": self.message, 
+            "env": self.env
+        })
+
+
 class EnvironmentVariableException(ValidationException):
     def __init__(
         self: "EnvironmentVariableException", 
