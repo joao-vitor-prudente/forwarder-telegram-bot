@@ -5,7 +5,7 @@
 *.sqlite3
 *.session
 *.session-journal
-__pycache__/
+/pycache/*
 .git
 *.log
 *.pem
