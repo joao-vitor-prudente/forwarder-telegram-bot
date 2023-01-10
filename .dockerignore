@@ -1,9 +1,4 @@
 .venv
-*.db
-*.sqlite
-*.sqlite3
-*.session
-*.session-journal
 __pycache__
 README.MD
 licence

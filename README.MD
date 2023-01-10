@@ -104,16 +104,20 @@ python main.py dev
 Build image:
 
 ```bash
-docker build --tag forwarder-telegram-bot 
+docker build --tag forwarder-telegram-bot  ./
 ```
 
 Run container:
 
 ```bash
-docker run -ti --name forwarder-telegram-bot ./
+docker run forwarder-telegram-bot
 ```
 
--ti is important because you will have to give user input to the terminal to provide the confirmation code the telegram will give you the first time you create the client.
+When the program starts the first time, telegram will send you a confirmation code, which you will be asked by the program, after you do this, the program will generate a session.session file in the root directory of the app, which will be used to log in to telegram.
+
+So if you do not have already a session.session file, you will have to run it in interactive mode (add a -ti in the command after run).
+
+I recommend you to first run the program without docker, generate the session.session file and then run it in docker.
 
 ## Usage
 
