@@ -28,6 +28,7 @@ def get_env_var(var_name: str) -> str | Exception:
     # get all environment variables
 
     if env_var is None:
+        print(var_name)
         return EnvironmentVariableException(var_name=var_name)
     
     return env_var

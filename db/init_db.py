@@ -13,6 +13,7 @@ def init_db(connection_str: str) -> tuple[EngineProtocol, SessionProtocol] | Exc
     :param connection_str_: connection string.
     :return: engine_ and session sqlalchemy objects.
     """
+    
     try:
         engine: Engine = create_engine(connection_str)
         session: Session = sessionmaker()(bind=engine)

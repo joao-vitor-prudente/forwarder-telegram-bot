@@ -1,7 +1,9 @@
 bcrypt==4.0.1
 greenlet==2.0.1
+protobuf==4.21.12
 pyaes==1.6.1
 pyasn1==0.4.8
+PyMySQL==1.1.0
 python-dotenv==0.21.0
 rsa==4.9
 SQLAlchemy==1.4.46

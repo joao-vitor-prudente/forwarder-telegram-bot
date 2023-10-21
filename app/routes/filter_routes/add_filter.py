@@ -82,7 +82,7 @@ def commit_to_database(condition: str, mode: str, session: SessionProtocol, repl
     
     try:
         filter_ = Filter(id=str(uuid4()), condition=condition, mode=mode, replacement=replacement)
-        session.add(filter_)
+        session.add(instance=filter_)
         session.commit()
     except SQLAlchemyError as e:
         session.rollback()

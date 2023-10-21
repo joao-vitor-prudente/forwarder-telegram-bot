@@ -1,3 +1,6 @@
+import pymysql
+pymysql.install_as_MySQLdb()
+
 from bcrypt import hashpw
 
 from argparse import ArgumentParser
@@ -25,7 +28,7 @@ def configure_parser() -> ArgumentParser:
 
 
 def main() -> None | Exception:
-    connection_str: str = "sqlite:///database.db"
+    connection_str: str = get_env_var("DATABASE_URL")
     
     db: tuple[EngineProtocol, SessionProtocol] | Exception = init_db(connection_str)
     if isinstance(db, Exception): return db
